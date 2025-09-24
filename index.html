@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Twin-Modus Scorer</title>
+<style>
+:root{
+  --gap:12px;--pad:14px;--radius:12px;
+  --font:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box;font-family:var(--font)}
+body{margin:0;background:#f6f6f8;color:#111}
+header{background:#fff;padding:var(--pad);box-shadow:0 2px 6px rgba(0,0,0,.1);position:sticky;top:0;z-index:10}
+h1{margin:0;font-size:1.2rem;text-align:center}
+main{padding:var(--pad)}
+.card{background:#fff;border-radius:var(--radius);padding:var(--pad);margin-bottom:var(--gap);box-shadow:0 1px 4px rgba(0,0,0,.06)}
+label{font-weight:600;display:block;margin-bottom:4px}
+input,select,button{font-size:1rem;padding:10px 12px;border:1px solid #ccc;border-radius:10px;width:100%}
+button.share{
+  margin-top:12px;
+  background:#2196f3;
+  color:#fff;
+  border:none;
+  border-radius:10px;
+}
+button.share:active{background:#1976d2}
+select.tore{
+  width:100%;
+  height:48px;
+  font-size:1.2rem;
+  box-sizing:border-box;
+  text-align:center;
+  text-align-last:center;
+  -moz-text-align-last:center;
+}
+.row{display:flex;flex-wrap:wrap;gap:var(--gap)}
+.row>div{flex:1 1 140px}
+.score{font-size:1.8rem;font-weight:bold;text-align:center}
+.total-wrapper{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:24px;
+  text-align:center;
+}
+.total-team{display:flex;flex-direction:column;align-items:center;min-width:90px}
+.total-team .name{color:#555;font-weight:600;margin-bottom:4px;text-align:center}
+.total-team.winner .score{color:#2e7d32}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:center;padding:8px;border-bottom:1px solid #eee}
+th{background:#fafafa;font-weight:600}
+.chip{padding:4px 8px;border-radius:999px;background:#efefef;font-size:.9rem;display:inline-block;min-width:36px}
+.win{background:#d7f7d9}
+.draw{background:#f7f4d7}
+.loss{background:#fbd7d7}
+.round-header:nth-of-type(odd){background:#e3f2fd;border-left:5px solid #2196f3}
+.round-header:nth-of-type(even){background:#e8f5e9;border-left:5px solid #43a047}
+.round-header{
+  padding:6px 10px;font-weight:600;
+  margin:-14px -14px 0 -14px;
+  border-top-left-radius:12px;border-top-right-radius:12px;
+}
+.team-label{
+  font-weight:600;
+  font-size:.9rem;
+  margin-bottom:4px;
+  text-align:center;
+  color:#333;
+}
+
+/* Hamburger-Menü */
+#menuButton{
+  position:fixed;
+  top:12px; left:12px;
+  font-size:2rem;
+  cursor:pointer;
+  z-index:1001;
+  user-select:none;
+}
+#sideMenu{
+  position:fixed;
+  top:0; left:-240px;
+  width:240px; height:100%;
+  background:#fff;
+  box-shadow:2px 0 6px rgba(0,0,0,.2);
+  transition:left .3s ease;
+  padding:60px 20px 20px 20px;
+  z-index:1000;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+#sideMenu.open{ left:0; }
+#sideMenu a{
+  display:block;
+  margin-bottom:16px;
+  color:#2196f3;
+  font-weight:600;
+  text-decoration:none;
+}
+#savedList{
+  margin-top:20px;
+  font-size:0.9rem;
+  flex:1;
+  overflow:auto;
+}
+.saved-entry{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:8px;
+}
+.saved-entry button{
+  background:none;
+  border:none;
+  color:#e53935;
+  font-size:1.2rem;
+  cursor:pointer;
+}
+
+@media (max-width:480px){
+  table thead{display:none}
+  table,tbody,tr,td{display:block;width:100%}
+  tr{margin-bottom:var(--gap);background:#fafafa;border-radius:8px;padding:8px 0}
+  td{border:none;text-align:left;padding:4px 12px}
+  td::before{font-weight:bold;display:inline-block;width:120px}
+  td:nth-child(1)::before{content:"Spielfeld: "}
+  td:nth-child(4)::before{content:"Wertung: "}
+  td .chip{margin-left:4px}
+}
+</style>
+</head>
+<body>
+
+<!-- Hamburger-Menü -->
+<div id="menuButton">☰</div>
+<nav id="sideMenu">
+  <div>
+    <a href="#" id="showDays">Gespeicherte Spieltage</a>
+    <a href="regeln.pdf" target="_blank">📄 NFV-Rahmenrichtlinien (PDF)</a>
+    <div id="savedList"></div>
+  </div>
+  <div>
+    <a href="#" id="saveDay">Spieltag speichern</a>
+  </div>
+</nav>
+
+<header>
+  <h1>⚽ Twin-Modus Scorer</h1>
+</header>
+
+<main>
+  <section class="card">
+    <div class="row">
+      <div>
+        <label for="teamA">Heim</label>
+        <input id="teamA" value="Mannschaft A">
+      </div>
+      <div>
+        <label for="teamB">Gast</label>
+        <input id="teamB" value="Mannschaft B">
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+      <div>
+        <label for="rounds">Durchgänge</label>
+        <select id="rounds"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+      </div>
+      <div>
+        <label for="fields">Spielfelder</label>
+        <select id="fields"><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;text-align:right;">
+      <button id="reset">Zurücksetzen</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="total-wrapper">
+      <div class="total-team" id="teamAbox">
+        <div class="name" id="nameA">Mannschaft A</div>
+        <div id="scoreA" class="score">0</div>
+      </div>
+      <div style="font-size:2rem;font-weight:bold;">:</div>
+      <div class="total-team" id="teamBbox">
+        <div class="name" id="nameB">Mannschaft B</div>
+        <div id="scoreB" class="score">0</div>
+      </div>
+    </div>
+    <button id="share" class="share">📤 Ergebnis teilen</button>
+  </section>
+
+  <section id="inputs"></section>
+</main>
+
+<script>
+(function(){
+  const $=sel=>document.querySelector(sel);
+  const state={teamA:'Mannschaft A',teamB:'Mannschaft B',rounds:2,fields:2,data:{}};
+
+  const fieldLabel=i=>`${i+1}`;
+
+  const makeOptions=()=> {
+    let html='<option value="">–</option>';
+    for(let i=0;i<=40;i++) html+=`<option value="${i}">${i}</option>`;
+    return html;
+  };
+
+  function build(){
+    state.teamA=$('#teamA').value.trim()||'Heim';
+    state.teamB=$('#teamB').value.trim()||'Gast';
+    state.rounds=parseInt($('#rounds').value);
+    state.fields=parseInt($('#fields').value);
+
+    $('#nameA').textContent=state.teamA;
+    $('#nameB').textContent=state.teamB;
+
+    const container=$('#inputs'); container.innerHTML='';
+    for(let r=0;r<state.rounds;r++){
+      const card=document.createElement('div'); card.className='card';
+      const header=document.createElement('div');
+      header.className='round-header';
+      header.textContent=`Durchgang ${r+1}`;
+      card.appendChild(header);
+
+      const table=document.createElement('table');
+      table.innerHTML=`<thead>
+        <tr>
+          <th>Spielfeld</th>
+          <th>Heim</th>
+          <th>Gast</th>
+          <th>Wertung</th>
+        </tr>
+      </thead>`;
+      const tbody=document.createElement('tbody');
+
+      for(let f=0;f<state.fields;f++){
+        const key=`r${r}_f${f}`;
+        const row=state.data[key]|| {ga:'',gb:''};
+        const tr=document.createElement('tr');
+
+        const tdField=document.createElement('td');
+        tdField.textContent=fieldLabel(f);
+        tr.appendChild(tdField);
+
+        const tdA=document.createElement('td');
+        const labelA=document.createElement('div');
+        labelA.className='team-label';
+        labelA.textContent=state.teamA;
+        const selA=document.createElement('select');
+        selA.className='tore';
+        selA.innerHTML=makeOptions();
+        selA.value=row.ga;
+        selA.onchange=()=>{state.data[key]={ga:selA.value,gb:selB.value}; render();};
+        tdA.appendChild(labelA);
+        tdA.appendChild(selA);
+        tr.appendChild(tdA);
+
+        const tdB=document.createElement('td');
+        const labelB=document.createElement('div');
+        labelB.className='team-label';
+        labelB.textContent=state.teamB;
+        const selB=document.createElement('select');
+        selB.className='tore';
+        selB.innerHTML=makeOptions();
+        selB.value=row.gb;
+        selB.onchange=()=>{state.data[key]={ga:selA.value,gb:selB.value}; render();};
+        tdB.appendChild(labelB);
+        tdB.appendChild(selB);
+        tr.appendChild(tdB);
+
+        const tdW=document.createElement('td');
+        tdW.id='w_'+key;
+        tdW.className='chip';
+        tr.appendChild(tdW);
+
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody); card.appendChild(table); container.appendChild(card);
+    }
+    render();
+  }
+
+  function cell(key){
+    const row=state.data[key];
+    if(!row) return {a:0,b:0,text:'–',cls:''};
+    const ga=parseInt(row.ga,10), gb=parseInt(row.gb,10);
+    if(isNaN(ga)||isNaN(gb)) return {a:0,b:0,text:'–',cls:''};
+    if(ga>gb) return {a:1,b:0,text:'1:0',cls:'win'};
+    if(ga<gb) return {a:0,b:1,text:'0:1',cls:'loss'};
+    return {a:1,b:1,text:'1:1',cls:'draw'};
+  }
+
+  function render(){
+    let A=0,B=0;
+    for(let r=0;r<state.rounds;r++){
+      for(let f=0;f<state.fields;f++){
+        const key=`r${r}_f${f}`, res=cell(key);
+        const el=document.getElementById('w_'+key);
+        if(el){el.textContent=res.text; el.className='chip '+res.cls;}
+        A+=res.a; B+=res.b;
+      }
+    }
+    $('#scoreA').textContent=A;
+    $('#scoreB').textContent=B;
+    $('#teamAbox').classList.remove('winner');
+    $('#teamBbox').classList.remove('winner');
+    if(A>B) $('#teamAbox').classList.add('winner');
+    else if(B>A) $('#teamBbox').classList.add('winner');
+  }
+
+  function generateResultText(){
+    let txt=`${state.teamA} ${$('#scoreA').textContent} : ${$('#scoreB').textContent} ${state.teamB}\n\n`;
+    for(let r=0;r<state.rounds;r++){
+      txt+=`Durchgang ${r+1}:\n`;
+      for(let f=0;f<state.fields;f++){
+        const key=`r${r}_f${f}`;
+        const row=state.data[key];
+        if(row && row.ga!=='' && row.gb!==''){
+          txt+=`  Spielfeld ${f+1}: ${row.ga} : ${row.gb}\n`;
+        }
+      }
+      txt+='\n';
+    }
+    return txt;
+  }
+
+  function shareResults(){
+    const text = generateResultText();
+    if (navigator.share) {
+      navigator.share({title:'Twin-Modus Ergebnis', text})
+        .catch(()=>{});
+    } else {
+      alert('Teilen wird von diesem Gerät/Browser nicht unterstützt.');
+    }
+  }
+
+  function refreshSavedList(){
+    const listDiv = document.getElementById('savedList');
+    listDiv.innerHTML = '';
+    const games = JSON.parse(localStorage.getItem('twinSpieltage') || '[]');
+
+    if (games.length === 0) {
+      listDiv.textContent = 'Keine gespeicherten Spieltage.';
+      return;
+    }
+
+    games.slice().reverse().forEach((g, idx) => {
+      const indexOriginal = games.length - 1 - idx;
+      const entry = document.createElement('div');
+      entry.className = 'saved-entry';
+
+      const link = document.createElement('a');
+      link.href = '#';
+      link.textContent = `${g.time} – ${g.teamA} vs ${g.teamB}`;
+      link.onclick = () => {
+        state.teamA = g.teamA;
+        state.teamB = g.teamB;
+        state.rounds = g.rounds;
+        state.fields = g.fields;
+        state.data = g.data;
+        build();
+        alert('Spieltag wurde geladen.');
+        sideMenu.classList.remove('open');
+        return false;
+      };
+
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '🗑️';
+      delBtn.title = 'Löschen';
+      delBtn.onclick = () => {
+        if (confirm('Diesen Spieltag wirklich löschen?')) {
+          games.splice(indexOriginal,1);
+          localStorage.setItem('twinSpieltage', JSON.stringify(games));
+          refreshSavedList();
+        }
+      };
+
+      entry.appendChild(link);
+      entry.appendChild(delBtn);
+      listDiv.appendChild(entry);
+    });
+  }
+
+  ['teamA','teamB','rounds','fields'].forEach(id=>{
+    document.getElementById(id).addEventListener('input',build);
+    document.getElementById(id).addEventListener('change',build);
+  });
+  document.getElementById('reset').addEventListener('click',()=>{if(confirm('Alles zurücksetzen?')){state.data={}; build();}});
+  document.getElementById('share').addEventListener('click',shareResults);
+
+  const menuButton = document.getElementById('menuButton');
+  const sideMenu = document.getElementById('sideMenu');
+  menuButton.onclick = () => {
+    sideMenu.classList.toggle('open');
+  };
+  document.addEventListener('click', (e) => {
+    if (sideMenu.classList.contains('open') &&
+        !sideMenu.contains(e.target) &&
+        e.target !== menuButton) {
+      sideMenu.classList.remove('open');
+    }
+  });
+
+  document.getElementById('saveDay').addEventListener('click', () => {
+    const games = JSON.parse(localStorage.getItem('twinSpieltage') || '[]');
+    games.push({
+      time: new Date().toLocaleString(),
+      teamA: state.teamA,
+      teamB: state.teamB,
+      rounds: state.rounds,
+      fields: state.fields,
+      data: state.data
+    });
+    localStorage.setItem('twinSpieltage', JSON.stringify(games));
+    alert('Spieltag wurde lokal gespeichert.');
+  });
+
+  document.getElementById('showDays').addEventListener('click', () => {
+    refreshSavedList();
+  });
+
+  build();
+})();
+</script>
+</body>
+</html>
